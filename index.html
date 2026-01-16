@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Dobavljači – QR</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="favicon.png">
 
 <style>
 body{
@@ -15,7 +14,7 @@ body{
   padding:20px;
   text-align:center;
 }
-h1{font-size:2.5rem}
+h1{font-size:2.4rem}
 select,button,input{
   font-size:1.1rem;
   padding:10px;
@@ -36,6 +35,7 @@ th,td{
 }
 .hidden{display:none}
 button{cursor:pointer}
+.red{color:red;font-weight:bold}
 </style>
 </head>
 
@@ -64,87 +64,98 @@ button{cursor:pointer}
   <th>Proizvod</th>
   <th>Šifra</th>
   <th>QR</th>
-  <th class="editCol hidden">X</th>
+  <th class="hidden" id="deleteHeader">X</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="tbody"></tbody>
 </table>
 
 <script>
-/* ========== CONFIG ========== */
+/* ================= CONFIG ================= */
 const SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbzlbvm4fou_e_RH_S0pi4K6XFrCh5lf3CbaXXJWo5o04S_XdeYb-IQZp-mmQTtMFGCd/exec";
 
-/* ========== STATE ========== */
+/* ================= STATE ================= */
 let data = [];
 let editMode = false;
 
-/* ========== LOAD DATA ========== */
+/* ================= LOAD ================= */
 async function loadData(){
   const res = await fetch(SCRIPT_URL);
   data = await res.json();
-  populateSuppliers();
+  fillSuppliers();
   renderTable();
 }
 
-function populateSuppliers(){
+function fillSuppliers(){
   const sel = document.getElementById("supplierSelect");
   sel.innerHTML = '<option value="">-- Odaberite --</option>';
-  [...new Set(data.map(d => d.dobavljac))].forEach(d => {
+  const list = [...new Set(data.map(r => r.dobavljac))];
+  list.forEach(d => {
     const o = document.createElement("option");
-    o.value = o.textContent = d;
+    o.value = d;
+    o.textContent = d;
     sel.appendChild(o);
   });
 }
 
-/* ========== RENDER TABLE ========== */
+/* ================= RENDER ================= */
 document.getElementById("supplierSelect").onchange = renderTable;
 
 function renderTable(){
   const sup = supplierSelect.value;
-  const tbody = document.querySelector("#table tbody");
+  const table = document.getElementById("table");
+  const tbody = document.getElementById("tbody");
   tbody.innerHTML = "";
 
   if(!sup){
     table.classList.add("hidden");
     return;
   }
+
   table.classList.remove("hidden");
 
-  data.filter(d => d.dobavljac === sup).forEach(d => {
+  data.filter(r => r.dobavljac === sup).forEach(r => {
     const tr = document.createElement("tr");
 
-    tr.innerHTML = `
-      <td>${d.proizvod}</td>
-      <td>${d.sifra}</td>
-      <td>
-        <button onclick="printQR('${d.proizvod}','${d.sifra}')">QR</button>
-      </td>
-    `;
+    const tdP = document.createElement("td");
+    tdP.textContent = r.proizvod;
+
+    const tdS = document.createElement("td");
+    tdS.textContent = r.sifra;
+
+    const tdQR = document.createElement("td");
+    const qrBtn = document.createElement("button");
+    qrBtn.textContent = "QR";
+    qrBtn.onclick = function(){ printQR(r.proizvod, r.sifra); };
+    tdQR.appendChild(qrBtn);
+
+    tr.appendChild(tdP);
+    tr.appendChild(tdS);
+    tr.appendChild(tdQR);
 
     if(editMode){
-      const td = document.createElement("td");
-      td.textContent = "X";
-      td.style.color = "red";
-      td.onclick = () => del(d.sifra);
-      tr.appendChild(td);
+      const tdX = document.createElement("td");
+      tdX.textContent = "X";
+      tdX.className = "red";
+      tdX.onclick = function(){ del(r.sifra); };
+      tr.appendChild(tdX);
     }
 
     tbody.appendChild(tr);
   });
 }
 
-/* ========== EDIT MODE ========== */
-document.getElementById("editBtn").onclick = () => {
+/* ================= EDIT MODE ================= */
+document.getElementById("editBtn").onclick = function(){
   editMode = !editMode;
-  editForm.classList.toggle("hidden", !editMode);
-  document.querySelectorAll(".editCol")
-    .forEach(e => e.classList.toggle("hidden", !editMode));
+  document.getElementById("editForm").classList.toggle("hidden", !editMode);
+  document.getElementById("deleteHeader").classList.toggle("hidden", !editMode);
   renderTable();
 };
 
-/* ========== SAVE ========== */
-document.getElementById("saveBtn").onclick = async () => {
+/* ================= SAVE ================= */
+document.getElementById("saveBtn").onclick = async function(){
   const sup = supplierSelect.value;
   const p = productInput.value.trim();
   const c = codeInput.value.trim();
@@ -154,63 +165,51 @@ document.getElementById("saveBtn").onclick = async () => {
   }
 
   await fetch(SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: new URLSearchParams({
-      action: "upsert",
-      dobavljac: sup,
-      proizvod: p,
-      sifra: c
+    method:"POST",
+    mode:"no-cors",
+    body:new URLSearchParams({
+      action:"upsert",
+      dobavljac:sup,
+      proizvod:p,
+      sifra:c
     })
   });
 
-  productInput.value = "";
-  codeInput.value = "";
-  await loadData();
+  productInput.value="";
+  codeInput.value="";
+  loadData();
 };
 
-/* ========== DELETE (FIXED) ========== */
+/* ================= DELETE ================= */
 async function del(code){
   if(!confirm("Obrisati proizvod?")) return;
 
   await fetch(SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: new URLSearchParams({
-      action: "delete",
-      dobavljac: supplierSelect.value,
-      sifra: code
+    method:"POST",
+    mode:"no-cors",
+    body:new URLSearchParams({
+      action:"delete",
+      dobavljac:supplierSelect.value,
+      sifra:code
     })
   });
 
-  await loadData();
+  loadData();
 }
 
-/* ========== QR PRINT ========== */
-function printQR(proizvod, sifra){
-  const w = window.open("", "_blank");
-  w.document.write(`
-    <html>
-    <head>
-      <title>QR</title>
-      <style>
-        body{text-align:center;font-family:Arial;margin-top:40px}
-        h1{font-size:28px}
-        p{font-size:22px}
-      </style>
-    </head>
-    <body>
-      <h1>${proizvod}</h1>
-      <p>${sifra}</p>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(sifra)}">
-      <script>window.print()</script>
-    </body>
-    </html>
-  `);
+/* ================= QR ================= */
+function printQR(p,s){
+  const w = window.open("");
+  w.document.write("<html><head><title>QR</title></head><body style='text-align:center;font-family:Arial;margin-top:40px'>");
+  w.document.write("<h1>"+p+"</h1>");
+  w.document.write("<p>"+s+"</p>");
+  w.document.write("<img src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="+encodeURIComponent(s)+"'>");
+  w.document.write("<script>window.print()</script>");
+  w.document.write("</body></html>");
   w.document.close();
 }
 
-/* ========== INIT ========== */
+/* ================= INIT ================= */
 loadData();
 </script>
 
