@@ -2,7 +2,7 @@
 <html lang="sr">
 <head>
 <meta charset="UTF-8">
-<title>Dobavljači – QR</title>
+<title>Dobavljači – QR lista</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -14,9 +14,9 @@ body{
   padding:20px;
   text-align:center;
 }
-h1{font-size:2.4rem}
+h1{font-size:2.3rem}
 select,button,input{
-  font-size:1.1rem;
+  font-size:1.05rem;
   padding:10px;
   margin:6px;
   border-radius:8px;
@@ -37,20 +37,33 @@ th,td{
 button{cursor:pointer}
 .red{color:red;font-weight:bold}
 
-/* QR MODAL */
+/* MODAL ZA ŠTAMPU */
 #qrModal{
   position:fixed;
   inset:0;
-  background:rgba(0,0,0,0.9);
+  background:rgba(0,0,0,0.95);
   display:none;
   align-items:center;
   justify-content:center;
   z-index:9999;
 }
 #qrBox{
+  background:#000;
   border:2px solid #b6b44a;
   padding:20px;
-  background:#000;
+  max-height:90vh;
+  overflow:auto;
+}
+.qrItem{
+  page-break-inside:avoid;
+  margin-bottom:30px;
+  text-align:center;
+}
+.qrItem img{margin-top:6px}
+@media print{
+  body *{visibility:hidden}
+  #qrModal,#qrModal *{visibility:visible}
+  #qrModal{position:static}
 }
 </style>
 </head>
@@ -65,6 +78,7 @@ button{cursor:pointer}
 
 <br>
 <button id="editBtn">Uredi</button>
+<button onclick="printAll()">Štampaj listu</button>
 
 <div id="editForm" class="hidden">
   <br>
@@ -79,32 +93,32 @@ button{cursor:pointer}
 <tr>
   <th>Proizvod</th>
   <th>Šifra</th>
-  <th>QR</th>
   <th id="delHead" class="hidden">X</th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
 
-<!-- QR MODAL -->
+<!-- MODAL ZA ŠTAMPU -->
 <div id="qrModal">
   <div id="qrBox">
-    <h2 id="qrTitle"></h2>
-    <p id="qrCodeText"></p>
-    <img id="qrImg">
-    <br><br>
+    <div id="printContent"></div>
+    <br>
     <button onclick="window.print()">Štampaj</button>
-    <button onclick="closeQR()">Zatvori</button>
+    <button onclick="closePrint()">Zatvori</button>
   </div>
 </div>
 
 <script>
+/* ================= CONFIG ================= */
 const SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbzlbvm4fou_e_RH_S0pi4K6XFrCh5lf3CbaXXJWo5o04S_XdeYb-IQZp-mmQTtMFGCd/exec";
 
+/* ================= STATE ================= */
 let data=[];
 let editMode=false;
 
+/* ================= LOAD ================= */
 async function loadData(){
   const r=await fetch(SCRIPT_URL);
   data=await r.json();
@@ -123,6 +137,7 @@ function fillSuppliers(){
 
 supplierSelect.onchange=renderTable;
 
+/* ================= TABLE ================= */
 function renderTable(){
   tbody.innerHTML="";
   if(!supplierSelect.value){
@@ -133,16 +148,8 @@ function renderTable(){
 
   data.filter(x=>x.dobavljac===supplierSelect.value).forEach(r=>{
     const tr=document.createElement("tr");
-
     tr.appendChild(td(r.proizvod));
     tr.appendChild(td(r.sifra));
-
-    const q=td("");
-    const qb=document.createElement("button");
-    qb.textContent="QR";
-    qb.onclick=()=>showQR(r.proizvod,r.sifra);
-    q.appendChild(qb);
-    tr.appendChild(q);
 
     if(editMode){
       const x=td("X");
@@ -161,6 +168,7 @@ function td(t){
   return d;
 }
 
+/* ================= EDIT ================= */
 editBtn.onclick=()=>{
   editMode=!editMode;
   editForm.classList.toggle("hidden",!editMode);
@@ -188,7 +196,7 @@ saveBtn.onclick=async()=>{
 };
 
 async function del(code){
-  if(!confirm("Obrisati?"))return;
+  if(!confirm("Obrisati proizvod?"))return;
   await fetch(SCRIPT_URL,{
     method:"POST",
     mode:"no-cors",
@@ -201,19 +209,37 @@ async function del(code){
   loadData();
 }
 
-/* QR MODAL */
-function showQR(p,s){
-  qrTitle.textContent=p;
-  qrCodeText.textContent=s;
-  qrImg.src=
-    "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="+
-    encodeURIComponent(s);
+/* ================= ŠTAMPA LISTE ================= */
+function printAll(){
+  if(!supplierSelect.value){
+    alert("Odaberi dobavljača");return;
+  }
+  const list=data.filter(x=>x.dobavljac===supplierSelect.value);
+  if(list.length===0){
+    alert("Nema proizvoda");return;
+  }
+
+  printContent.innerHTML="<h2>"+supplierSelect.value+"</h2>";
+
+  list.forEach(i=>{
+    const d=document.createElement("div");
+    d.className="qrItem";
+    d.innerHTML=
+      "<strong>"+i.proizvod+"</strong><br>"+
+      i.sifra+"<br>"+
+      "<img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+
+      encodeURIComponent(i.sifra)+"'>";
+    printContent.appendChild(d);
+  });
+
   qrModal.style.display="flex";
 }
-function closeQR(){
+
+function closePrint(){
   qrModal.style.display="none";
 }
 
+/* ================= INIT ================= */
 loadData();
 </script>
 
