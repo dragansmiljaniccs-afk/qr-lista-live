@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<title>Dobavljači – QR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="favicon.png">
+
+<style>
+body{
+  background:#000;
+  color:#b6b44a;
+  font-family:Arial, sans-serif;
+  margin:0;
+  padding:20px;
+  text-align:center;
+}
+h1{font-size:2.5rem}
+select,button,input{
+  font-size:1.1rem;
+  padding:10px;
+  margin:6px;
+  border-radius:8px;
+  border:2px solid #b6b44a;
+  background:#000;
+  color:#b6b44a;
+}
+table{
+  width:100%;
+  margin-top:20px;
+  border-collapse:collapse;
+}
+th,td{
+  border:2px solid #b6b44a;
+  padding:8px;
+}
+.hidden{display:none}
+button{cursor:pointer}
+</style>
+</head>
+
+<body>
+
+<h1>Dobavljač</h1>
+
+<select id="supplierSelect">
+  <option value="">-- Odaberite --</option>
+</select>
+
+<br>
+<button id="editBtn">Uredi</button>
+
+<div id="editForm" class="hidden">
+  <br>
+  <input id="productInput" placeholder="Proizvod">
+  <input id="codeInput" placeholder="Šifra">
+  <br>
+  <button id="saveBtn">Spremi</button>
+</div>
+
+<table id="table" class="hidden">
+<thead>
+<tr>
+  <th>Proizvod</th>
+  <th>Šifra</th>
+  <th>QR</th>
+  <th class="editCol hidden">X</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+/* ========== CONFIG ========== */
+const SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbzlbvm4fou_e_RH_S0pi4K6XFrCh5lf3CbaXXJWo5o04S_XdeYb-IQZp-mmQTtMFGCd/exec";
+
+/* ========== STATE ========== */
+let data = [];
+let editMode = false;
+
+/* ========== LOAD DATA ========== */
+async function loadData(){
+  const res = await fetch(SCRIPT_URL);
+  data = await res.json();
+  populateSuppliers();
+  renderTable();
+}
+
+function populateSuppliers(){
+  const sel = document.getElementById("supplierSelect");
+  sel.innerHTML = '<option value="">-- Odaberite --</option>';
+  [...new Set(data.map(d => d.dobavljac))].forEach(d => {
+    const o = document.createElement("option");
+    o.value = o.textContent = d;
+    sel.appendChild(o);
+  });
+}
+
+/* ========== RENDER TABLE ========== */
+document.getElementById("supplierSelect").onchange = renderTable;
+
+function renderTable(){
+  const sup = supplierSelect.value;
+  const tbody = document.querySelector("#table tbody");
+  tbody.innerHTML = "";
+
+  if(!sup){
+    table.classList.add("hidden");
+    return;
+  }
+  table.classList.remove("hidden");
+
+  data.filter(d => d.dobavljac === sup).forEach(d => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${d.proizvod}</td>
+      <td>${d.sifra}</td>
+      <td>
+        <button onclick="printQR('${d.proizvod}','${d.sifra}')">QR</button>
+      </td>
+    `;
+
+    if(editMode){
+      const td = document.createElement("td");
+      td.textContent = "X";
+      td.style.color = "red";
+      td.onclick = () => del(d.sifra);
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+/* ========== EDIT MODE ========== */
+document.getElementById("editBtn").onclick = () => {
+  editMode = !editMode;
+  editForm.classList.toggle("hidden", !editMode);
+  document.querySelectorAll(".editCol")
+    .forEach(e => e.classList.toggle("hidden", !editMode));
+  renderTable();
+};
+
+/* ========== SAVE ========== */
+document.getElementById("saveBtn").onclick = async () => {
+  const sup = supplierSelect.value;
+  const p = productInput.value.trim();
+  const c = codeInput.value.trim();
+  if(!sup || !p || !c){
+    alert("Popuni sva polja");
+    return;
+  }
+
+  await fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: new URLSearchParams({
+      action: "upsert",
+      dobavljac: sup,
+      proizvod: p,
+      sifra: c
+    })
+  });
+
+  productInput.value = "";
+  codeInput.value = "";
+  await loadData();
+};
+
+/* ========== DELETE (FIXED) ========== */
+async function del(code){
+  if(!confirm("Obrisati proizvod?")) return;
+
+  await fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: new URLSearchParams({
+      action: "delete",
+      dobavljac: supplierSelect.value,
+      sifra: code
+    })
+  });
+
+  await loadData();
+}
+
+/* ========== QR PRINT ========== */
+function printQR(proizvod, sifra){
+  const w = window.open("", "_blank");
+  w.document.write(`
+    <html>
+    <head>
+      <title>QR</title>
+      <style>
+        body{text-align:center;font-family:Arial;margin-top:40px}
+        h1{font-size:28px}
+        p{font-size:22px}
+      </style>
+    </head>
+    <body>
+      <h1>${proizvod}</h1>
+      <p>${sifra}</p>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(sifra)}">
+      <script>window.print()</script>
+    </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+/* ========== INIT ========== */
+loadData();
+</script>
+
+</body>
+</html>
