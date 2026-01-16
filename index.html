@@ -198,15 +198,33 @@ async function del(code){
 }
 
 /* ================= QR ================= */
-function printQR(p,s){
-  const w = window.open("");
-  w.document.write("<html><head><title>QR</title></head><body style='text-align:center;font-family:Arial;margin-top:40px'>");
-  w.document.write("<h1>"+p+"</h1>");
-  w.document.write("<p>"+s+"</p>");
-  w.document.write("<img src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="+encodeURIComponent(s)+"'>");
-  w.document.write("<script>window.print()</script>");
-  w.document.write("</body></html>");
+function printQR(p, s){
+  const w = window.open("", "_blank");
+  w.document.open();
+  w.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>QR</title>
+      <style>
+        body {
+          text-align: center;
+          font-family: Arial;
+          margin-top: 40px;
+        }
+        h1 { font-size: 28px; }
+        p { font-size: 22px; }
+      </style>
+    </head>
+    <body>
+      <h1>${p}</h1>
+      <p>${s}</p>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(s)}">
+    </body>
+    </html>
+  `);
   w.document.close();
+  w.onload = () => w.print();
 }
 
 /* ================= INIT ================= */
