@@ -6,6 +6,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+  #printContent{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:20px;
+}
+.qrItem{
+  text-align:center;
+  page-break-inside:avoid;
+}
+
 body{
   background:#000;
   color:#b6b44a;
@@ -227,7 +237,7 @@ function printAll(){
     d.innerHTML=
       "<strong>"+i.proizvod+"</strong><br>"+
       i.sifra+"<br>"+
-      "<img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+
+      "<img src='https://api.qrserver.com/v1/create-qr-code/?size=120x120&data="+
       encodeURIComponent(i.sifra)+"'>";
     printContent.appendChild(d);
   });
